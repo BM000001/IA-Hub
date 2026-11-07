@@ -160,10 +160,10 @@ export function restoreFromCheckpoint(
   }
 
   const completed = new Set(checkpoint.completedStepIds);
+  const { error: _previousError, ...taskWithoutError } = task;
   return {
-    ...task,
+    ...taskWithoutError,
     status: "paused",
-    error: undefined,
     steps: task.steps.map((step) => ({
       ...step,
       status: completed.has(step.id) ? "completed" : "pending"
