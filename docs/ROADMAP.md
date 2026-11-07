@@ -1,18 +1,23 @@
 # Roadmap
 
-## Fase 0 — Fundação (atual)
+## Fase 0 — Fundação (concluída parcialmente)
 
 - [x] Definir objetivo e independência em relação ao Alfred.
 - [x] Documentar arquitetura, segurança e roadmap.
 - [x] Criar esqueleto TypeScript sem dependências de provedores externos.
-- [ ] Validar build e testes em CI.
+- [x] Criar workflow de CI para validar build, tipos e testes.
+- [ ] Confirmar execução verde do CI no GitHub.
 
 ## Fase 1 — Núcleo funcional
 
-- [ ] Modelos de tarefa, etapas, estados e checkpoints.
-- [ ] Orquestrador local com execução simulada.
-- [ ] Registro de eventos e histórico.
-- [ ] Testes unitários e integração contínua.
+- [x] Modelos de tarefa, etapas e estados.
+- [x] Orquestrador local com execução simulada.
+- [x] Dependências entre etapas e detecção de ciclos.
+- [x] Eventos de execução e checkpoints em memória.
+- [x] Restauração de estado a partir de checkpoint.
+- [x] Testes automatizados do núcleo.
+- [ ] Persistir eventos e checkpoints fora da memória do processo.
+- [ ] Adicionar seleção de agentes por capacidade.
 
 ## Fase 2 — Persistência e identidade
 
