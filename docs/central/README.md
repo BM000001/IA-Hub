@@ -32,6 +32,14 @@ Esta branch e seus arquivos estão versionados; **isso não habilita GitHub Page
 
 A configuração preserva a `main` do IA-Hub e não substitui a publicação já existente do Alfred. A mudança da origem do Pages deve ser conferida antes de salvar caso haja uma configuração anterior que não foi detectada. Não inserir tokens GitHub em HTML/JS público.
 
+## Nova distinção de estados (15/11/2026)
+
+Os cartões exibem **a origem de cada registro** (Alfred principal ou Alfred-Laboratory). A Central diferencia PR em rascunho, PR aberta para revisão, Issue prioritária, decisão explicitamente sinalizada por label e registros fechados. Uma PR mesclada somente é identificada como integrada quando `pull_request.merged_at` está disponível na resposta pública. Nenhum desses estados é interpretado como homologação física.
+
+Ao abrir os detalhes de uma PR, a página consulta o SHA da `head` dessa PR e as verificações públicas de CI associadas. Indica sucesso apenas se há verificações e todas as retornadas terminaram com conclusão `success`, `neutral` ou `skipped`, sem paginação pendente; CI pendente, falha, ausência ou erro são diferenciados. **CI não é teste real no iPhone.** O marco de teste físico e a aprovação do proprietário permanecem **não verificados** na ausência de evidências independentes.
+
+As chamadas extras de CI só ocorrem quando se abre uma PR, para economizar a cota pública da API. Esta melhoria foi enviada na branch de publicação e teve sintaxe JavaScript verificada; ainda requer confirmar o deploy e uma nova visita no Safari para homologação visual.
+
 ## Verificações e próximos passos
 
 - Verificado pela conexão GitHub: arquivos enviados à branch independente; os commits devem ser conferidos por leitura de retorno.
