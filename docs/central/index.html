@@ -131,8 +131,8 @@
       <div class="cards" id="task-list" role="tabpanel" aria-labelledby="tab-ativas"></div>
     </section>
     <section class="notes" aria-labelledby="notes-title">
-      <h2 id="notes-title">Como a versão real funcionará</h2>
-      <p>O GitHub fornece os registros públicos de Issues e PRs. Esta primeira integração distingue código em PR, pendência aberta e registro fechado. <strong>PR aberta ou Issue fechada não provam teste, aprovação nem integração.</strong> A classificação por abas é provisória e não prova execução por agentes.</p>
+      <h2 id="notes-title">O que esta versão comprova</h2>
+      <p>O GitHub fornece os registros públicos de Issues e PRs. Esta primeira integração distingue código em PR, pendência aberta e registro fechado. <strong>PR aberta ou Issue fechada não provam teste, aprovação nem integração.</strong> A origem de cada item identifica Alfred principal ou Laboratory. PR em rascunho é diferente de PR aberta para revisão; nenhuma delas comprova entrega pronta.</p>
       <p>A página consulta a API pública do GitHub ao abrir e verifica atualizações aproximadamente a cada 5 minutos enquanto estiver visível. A API impõe limites de requisições; em falhas, mostra o erro sem inventar andamento. Até 100 registros recentes por repositório e estado são carregados (sem paginação). Não há login, alertas, capturas antes/depois, controle de agentes ou autorização de ações nesta versão.</p>
       <div class="source">
         <a href="https://github.com/BM000001/Alfred-Laboratory/issues/44" target="_blank" rel="noopener noreferrer">Decisões da Central (#44)</a>
@@ -147,27 +147,34 @@
       <div class="dialog-top"><div><p class="eyebrow" id="detail-id"></p><h2 id="detail-title"></h2></div><button class="close" id="close" type="button" aria-label="Fechar detalhes">×</button></div>
       <p id="detail-desc"></p>
       <div class="detail-grid">
-        <div class="detail-box"><span>Estado ilustrativo</span><strong id="detail-status"></strong></div>
-        <div class="detail-box"><span>Etapas confirmadas neste exemplo</span><strong id="detail-progress"></strong></div>
+        <div class="detail-box"><span>Estado público do registro</span><strong id="detail-status"></strong></div>
+        <div class="detail-box"><span>Marcos com evidência</span><strong id="detail-progress"></strong></div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-box"><span>CI automatizado</span><strong id="detail-ci">Ainda não consultado</strong></div>
+        <div class="detail-box"><span>Teste físico no iPhone</span><strong id="detail-iphone">Não verificado</strong></div>
+        <div class="detail-box"><span>Decisão do proprietário</span><strong id="detail-owner">Não verificada</strong></div>
+        <div class="detail-box"><span>Integração</span><strong id="detail-merge">Não verificada</strong></div>
       </div>
       <h3>Etapas de entrega</h3><ul class="step-list" id="detail-steps"></ul>
       <h3>Visual · antes e depois</h3><div class="visual-placeholder">Nenhuma captura de antes/depois foi verificada ou vinculada a commit para este registro.</div>
       <h3>O que mudou por dentro</h3><p id="detail-code"></p>
       <h3>Próximo passo</h3><p id="detail-next"></p>
-      <p class="muted">CI, teste no Safari/iPhone, aprovação do proprietário e execução de agentes: não verificados por esta leitura.</p><p><a id="detail-link" href="https://github.com/BM000001/Alfred" target="_blank" rel="noopener noreferrer">Abrir o registro original no GitHub</a></p>
+      <p class="muted">CI é consultado para PRs quando os detalhes são abertos. Teste físico no iPhone, autorização do proprietário e agentes em execução não podem ser inferidos só por uma PR.</p><p><a id="detail-link" href="https://github.com/BM000001/Alfred" target="_blank" rel="noopener noreferrer">Abrir o registro original no GitHub</a></p>
     </div>
   </dialog>
   <script>
     "use strict";
     const REPOS = ["BM000001/Alfred", "BM000001/Alfred-Laboratory"];
     const INTERVAL_MS = 5 * 60 * 1000;
-    const STAGES = ["Código em PR", "CI verificado", "Testado no iPhone", "Aprovado e integrado", "Encerrado"];
+    const STAGES = ["Código em PR", "CI automatizado aprovado", "Testado no iPhone", "Aprovado pelo proprietário", "Integrado no destino"];
     let tasks = [];
     let activeLane = "ativas";
     let lastSync = 0;
     let activePromise = null;
     let historyLoaded = false;
     let focusTask = null;
+    let selectedDetailKey = null;
     const list = document.getElementById("task-list");
     const search = document.getElementById("search");
     const historyFilter = document.getElementById("history-filter");
@@ -179,18 +186,29 @@
     const dateLabel = (date) => new Intl.DateTimeFormat("pt-BR", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(date);
     function makeTask(issue, repo, isClosed) {
       const isPR = Boolean(issue.pull_request);
-      const prioritized = /^\[(?:P0|P1)\]/i.test(issue.title || "") || (issue.labels || []).some(label => /^(P0|P1|priority:high)$/i.test(label.name || ""));
-      let lane = isClosed ? "arquivados" : isPR || prioritized ? "ativas" : "futuras";
-      const status = isClosed ? (isPR ? "PR fechada · merge não verificado" : "Issue fechada · conclusão não verificada") : (isPR ? "PR aberta · revisão pendente" : prioritized ? "Issue prioritária aberta" : "Issue aberta · execução não verificada");
+      const labels = (issue.labels || []).map(label=>String(label.name || "").toLowerCase());
+      const prioritized = /^\[(?:P0|P1)\]/i.test(issue.title || "") || labels.some(label => /^(p0|p1|priority:high)$/.test(label));
+      const ownerRequested = labels.some(label => /^(aguardando-proprietario|owner-action-needed|needs-owner-review|decisao-pendente)$/.test(label));
+      const isMerged = isPR && Boolean(issue.pull_request.merged_at);
+      const isDraft = Boolean(issue.draft);
+      const lane = isClosed ? "arquivados" : isPR || prioritized || ownerRequested ? "ativas" : "futuras";
+      let status = "";
+      if (isClosed) status = isPR ? (isMerged ? "PR integrada · homologação não verificada" : "PR encerrada sem merge confirmado") : "Issue fechada · conclusão não verificada";
+      else if (isPR) status = isDraft ? "Código em PR · rascunho" : "Código em PR · aberta para revisão";
+      else status = ownerRequested ? "Decisão solicitada · registro aberto" : prioritized ? "Pendência prioritária · execução não verificada" : "Pendência aberta · execução não verificada";
       const link = safeLink(issue.html_url) ? issue.html_url : "https://github.com/" + repo;
+      const origin = repo === "BM000001/Alfred" ? "Alfred principal" : "Alfred-Laboratory";
       return {
-        id: shortRepo(repo) + " #" + issue.number, lane, status,
+        id: shortRepo(repo) + " #" + issue.number, repo, number:issue.number, origin, lane, status,
         title: String(issue.title || "Sem título"),
-        desc: (isPR ? "Pull request público" : "Issue pública") + " em " + repo + ". " + status + ". Última alteração registrada: " + (issue.updated_at ? dateLabel(new Date(issue.updated_at)) : "não informada") + ".",
-        steps: !isClosed && isPR ? 1 : 0,
-        code: isPR ? "Existe uma PR pública no GitHub. Esta visualização não inspeciona o diff nem confirma CI, testes, merge ou ausência de conflitos." : "Existe um registro de Issue pública; não é evidência de código implementado.",
-        next: isClosed ? "Verificar no GitHub se houve merge, homologação e encerramento correto." : isPR ? "Revisar o código, consultar CI e confirmar o teste no iPhone antes da aprovação." : "Verificar PRs relacionados, escopo e responsáveis antes de iniciar trabalho novo.",
-        url:link, isPR, isClosed, priority: prioritized, updatedAt: issue.updated_at || "",
+        desc: (isPR ? "Pull request" : "Issue") + " pública de " + origin + ". " + status + ". Última alteração: " + (issue.updated_at ? dateLabel(new Date(issue.updated_at)) : "não informada") + ".",
+        marks: [isPR,false,false,false,isMerged],
+        ciStatus:"CI ainda não consultado", ciChecked:false,
+        ownerState:ownerRequested ? "Decisão explicitamente sinalizada no GitHub" : "Não verificada",
+        mergeState:isMerged ? "Merge confirmado no GitHub" : isPR && !isClosed ? "PR ainda aberta" : "Não confirmado",
+        code: isPR ? "Há uma PR pública com código submetido; a revisão do diff e os testes físicos exigem evidências independentes." : "Há uma Issue pública. Isso não comprova que uma implementação começou.",
+        next: isClosed ? "Conferir a evidência de homologação e o destino da integração." : isPR ? (isDraft ? "Concluir ou revisar o rascunho antes de solicitar aprovação." : "Revisar CI, testar no iPhone quando aplicável e registrar aprovação explícita.") : (ownerRequested ? "Analisar a decisão indicada no registro do GitHub." : "Identificar dependências, PRs existentes e próximo responsável."),
+        url:link, isPR, isClosed, isMerged, isDraft, priority:prioritized, ownerRequested, updatedAt:issue.updated_at || ""
       };
     }
     async function getIssues(repo,state,signal) {
@@ -204,33 +222,76 @@
       if(!Array.isArray(data))throw new Error("Resposta inesperada do GitHub para " + repo);
       return data.map(issue=>makeTask(issue,repo,state==="closed"));
     }
+    function marksCount(task) {return task.marks.filter(Boolean).length;}
     function progressRow(task) {
       const line=document.createElement("div");line.className="milestone";
-      for(let i=0;i<STAGES.length;i++){const seg=document.createElement("span");seg.className="track"+(i<task.steps?" done":"");seg.setAttribute("aria-hidden","true");line.append(seg);}
-      const label=document.createElement("span");label.className="progress-label";label.textContent=task.steps+" de "+STAGES.length+" marcos verificados";line.append(label);return line;
+      for(let i=0;i<STAGES.length;i++){
+        const seg=document.createElement("span");seg.className="track"+(task.marks[i]?" done":"");seg.setAttribute("aria-hidden","true");line.append(seg);
+      }
+      const label=document.createElement("span");label.className="progress-label";
+      label.textContent=marksCount(task)+" de "+STAGES.length+" marcos comprovados";
+      line.append(label);return line;
     }
-    function showTask(task) {
-      set("detail-id",task.id+" · registro público");
+    function refreshDetail(task) {
+      set("detail-id",task.id+" · "+task.origin+" · registro público");
       set("detail-title",task.title);
       set("detail-desc",task.desc);
       set("detail-status",task.status);
-      set("detail-progress",task.steps+" de "+STAGES.length+" marcos");
+      set("detail-progress",marksCount(task)+" de "+STAGES.length+" marcos");
+      set("detail-ci",task.ciStatus);
+      set("detail-iphone","Não verificado por este painel");
+      set("detail-owner",task.ownerState);
+      set("detail-merge",task.mergeState);
       set("detail-code",task.code);
       set("detail-next",task.next);
       $("detail-link").href=task.url;
       const steps=$("detail-steps");steps.replaceChildren();
       STAGES.forEach((step,i)=>{
-        const li=document.createElement("li");if(i<task.steps)li.className="ok";
-        const mark=document.createElement("span");mark.textContent=i<task.steps?"✓":"–";
+        const li=document.createElement("li");if(task.marks[i])li.className="ok";
+        const mark=document.createElement("span");mark.textContent=task.marks[i]?"✓":"–";
         const title=document.createElement("span");title.style.display="inline";title.style.width="auto";title.style.height="auto";title.style.border="0";
-        title.textContent=step+(i<task.steps?" · evidência pública":" · não verificado");
+        title.textContent=step+(task.marks[i]?" · confirmado":" · não comprovado");
         li.append(mark,title);steps.append(li);
       });
+    }
+    async function inspectCi(task,key) {
+      if(!task.isPR || task.ciChecked)return;
+      task.ciStatus="Consultando verificações do GitHub…";
+      if(selectedDetailKey===key)refreshDetail(task);
+      try {
+        const apiBase="https://api.github.com/repos/"+task.repo;
+        const prResponse=await fetch(apiBase+"/pulls/"+task.number,{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});
+        if(!prResponse.ok)throw new Error("PR HTTP "+prResponse.status);
+        const pr=await prResponse.json();
+        const sha=pr.head && pr.head.sha;
+        if(!/^[0-9a-f]{40}$/.test(sha || ""))throw new Error("SHA da PR não disponível");
+        const checksResponse=await fetch(apiBase+"/commits/"+sha+"/check-runs?per_page=100",{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});
+        if(!checksResponse.ok)throw new Error("CI HTTP "+checksResponse.status);
+        const result=await checksResponse.json();
+        if(!Array.isArray(result.check_runs))throw new Error("Lista de verificações inválida");
+        const checks=result.check_runs;
+        task.marks[1]=false;
+        if(checks.length===0) task.ciStatus="Sem verificações públicas encontradas";
+        else if(checks.some(c=>c.status!=="completed")) task.ciStatus="CI em execução · "+checks.length+" verificação(ões)";
+        else if(checks.some(c=>!["success","neutral","skipped"].includes(c.conclusion))) task.ciStatus="CI com falhas ou cancelamentos";
+        else if(result.total_count>checks.length) task.ciStatus="CI parcialmente consultado · mais de 100 verificações";
+        else {task.marks[1]=true;task.ciStatus="CI automatizado aprovado · "+checks.length+" verificação(ões)";}
+        task.ciChecked=true;
+      } catch(error) {
+        task.ciStatus="CI não verificado: "+String(error.message || error);
+      }
+      if(selectedDetailKey===key && dialog.open)refreshDetail(task);
+      render();
+    }
+    function showTask(task) {
+      selectedDetailKey=task.id;
+      refreshDetail(task);
       dialog.showModal();
+      inspectCi(task,task.id);
     }
     function updateFocus() {
-      const candidates=tasks.filter(t=>t.lane==="ativas");
-      const selected=candidates.find(t=>t.priority&&!t.isPR) || candidates.find(t=>t.isPR) || null;
+      const candidates=tasks.filter(t=>t.lane==="ativas"&&!t.isClosed);
+      const selected=candidates.find(t=>t.ownerRequested) || candidates.find(t=>t.priority&&!t.isPR) || candidates.find(t=>t.isPR&&!t.isDraft) || candidates.find(t=>t.isPR) || null;
       focusTask=selected;
       $("focus-detail").disabled=!selected;
       if(selected){
@@ -248,7 +309,7 @@
       const type=historyFilter.value;
       const selected=tasks.filter(t=>t.lane===activeLane && (!query || (t.title+" "+t.id+" "+t.status+" "+t.next).toLocaleLowerCase("pt-BR").includes(query)) && (activeLane!=="arquivados"||type==="todas"||(type==="concluida"?!t.isPR:t.isPR)));
       list.replaceChildren();
-      set("result-count",selected.length+" registro"+(selected.length===1?"":"s")+" público"+(selected.length===1?"":"s")+" nesta visão");
+      set("result-count",selected.length+" registro"+(selected.length===1?"":"s")+" público"+(selected.length===1?"":"s")+" · Alfred + Laboratory");
       if(!selected.length){
         const empty=document.createElement("p");empty.className="empty";
         empty.textContent=lastSync ? "Nenhum registro encontrado para o filtro." : "Ainda não há registros carregados. Confira a mensagem de sincronização.";
@@ -257,7 +318,7 @@
       selected.forEach(t=>{
         const card=document.createElement("article");card.className="task";
         const content=document.createElement("div");const meta=document.createElement("div");meta.className="meta";
-        const code=document.createElement("span");code.textContent=t.id;
+        const code=document.createElement("span");code.textContent=t.origin+" · #"+t.number;
         const dot=document.createElement("span");dot.className="dot";dot.setAttribute("aria-hidden","true");
         const status=document.createElement("span");status.textContent=t.status;
         meta.append(code,dot,status);
@@ -314,6 +375,7 @@
     $("focus-detail").addEventListener("click",()=>{if(focusTask)showTask(focusTask);});
     $("close").addEventListener("click",()=>dialog.close());
     dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
+    dialog.addEventListener("close",()=>{selectedDetailKey=null;});
     document.addEventListener("visibilitychange",()=>{
       if(!document.hidden&&Date.now()-lastSync>INTERVAL_MS)sync("open");
     });
