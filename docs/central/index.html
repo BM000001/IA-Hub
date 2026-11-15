@@ -80,6 +80,39 @@
       .dialog-body{padding:20px}
     }
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  
+    main > section[aria-labelledby="priority-title"]{display:none}
+    .quick{margin-top:30px}
+    .quick-summary{font-size:13px;color:#aebac6;margin:7px 0 15px}
+    .quick-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:22px}
+    .quick-stat{background:#141d26;border:1px solid #33404d;border-radius:12px;padding:13px}
+    .quick-stat strong{display:block;font-size:25px;font-variant-numeric:tabular-nums}
+    .quick-stat span{display:block;color:#aab7c4;font-size:11px}
+    .quick-priorities{border-left:3px solid #cfb377;padding:0 0 0 14px;margin:0 0 23px}
+    .quick-priorities h3{margin-bottom:9px}
+    .quick-areas{display:grid;gap:10px;margin-bottom:18px}
+    .quick-area{background:#141d26;border:1px solid #33404d;border-radius:13px;overflow:hidden}
+    .quick-area summary{display:block;cursor:pointer;list-style:none;padding:16px;min-height:55px}
+    .quick-area summary::-webkit-details-marker{display:none}
+    .quick-area summary:after{content:"+";float:right;color:#d3bb89;font-size:20px;margin-top:-27px}
+    .quick-area[open] summary:after{content:"−"}
+    .quick-area strong{display:block;font-size:16px;padding-right:23px}
+    .quick-area small{display:block;font-size:12px;color:#aeb9c4;margin-top:3px}
+    .quick-area .preview{display:block;font-size:12px;color:#b9c3ce;margin-top:8px;padding-right:24px}
+    .quick-content{border-top:1px solid #33404d;padding:11px;display:grid;gap:9px}
+    .quick-record{border:1px solid #34424e;border-radius:10px;padding:13px;background:#101821}
+    .quick-record .meta{margin:0 0 6px;font-size:11px;color:#b0bac7}
+    .quick-record h4{font-size:14px;margin:0 0 6px;line-height:1.4}
+    .quick-record p{font-size:12px;color:#b8c3ce;margin:0 0 7px}
+    .quick-record a{font-size:12px}
+    .quick-technical{margin:15px 0 24px}
+    .quick-technical summary,.raw-detail > summary{cursor:pointer;font-size:14px;padding:14px 12px;border:1px solid #394652;border-radius:10px;color:#dfc58d}
+    .quick-technical .quick-content{border:0}
+    .raw-detail{margin:28px 0}
+    .raw-detail > .workspace{padding-top:15px;margin-top:0}
+    .quick-empty{font-size:13px;color:#b9c5d0;padding:12px;border:1px dashed #455463;border-radius:10px}
+    @media(max-width:600px){.quick-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-stat strong{font-size:23px}}
+
   </style>
 </head>
 <body>
@@ -112,6 +145,18 @@
         <button class="action" type="button" id="focus-detail" disabled>Examinar detalhes</button>
       </div>
     </section>
+    
+    <section class="quick" id="quick" aria-labelledby="quick-title">
+      <div class="heading"><h2 id="quick-title">Acompanhamento por funcionalidades</h2><span class="muted">Visão simplificada</span></div>
+      <p class="quick-summary">O objetivo é entender o que cada trabalho propõe, sem precisar ler todos os testes e commits. Toque numa área para abrir suas tarefas.</p>
+      <div class="quick-stats" id="quick-stats" aria-live="polite"></div>
+      <div class="quick-priorities" id="quick-priorities"></div>
+      <div class="quick-areas" id="quick-areas"><p class="quick-empty">Organizando os registros públicos do GitHub…</p></div>
+      <details class="quick-technical" id="quick-technical"><summary id="quick-tech-label">Testes e documentação (ver lista)</summary><div class="quick-content" id="quick-tech-items"></div></details>
+      <p class="muted">As áreas são agrupadas automaticamente pelo assunto do título. PRs relacionadas podem tratar da mesma entrega; não são consolidadas nem excluídas automaticamente. CI aprovado não comprova teste no iPhone nem sua aprovação.</p>
+    </section>
+
+    <details class="raw-detail"><summary>Ver lista técnica completa, filtros e histórico de PRs</summary>
     <section class="workspace" aria-labelledby="work-title">
       <div class="heading"><h2 id="work-title">Acompanhamento</h2><span class="muted">Registros públicos verificáveis</span></div>
       <div class="tabs" role="tablist" aria-label="Filtrar registros do projeto">
@@ -130,6 +175,7 @@
       </div>
       <div class="cards" id="task-list" role="tabpanel" aria-labelledby="tab-ativas"></div>
     </section>
+    </details>
     <section class="notes" aria-labelledby="notes-title">
       <h2 id="notes-title">O que esta versão comprova</h2>
       <p>O GitHub fornece os registros públicos de Issues e PRs. Esta primeira integração distingue código em PR, pendência aberta e registro fechado. <strong>PR aberta ou Issue fechada não provam teste, aprovação nem integração.</strong> A origem de cada item identifica Alfred principal ou Laboratory. PR em rascunho é diferente de PR aberta para revisão; nenhuma delas comprova entrega pronta.</p>
@@ -200,7 +246,7 @@
       const origin = repo === "BM000001/Alfred" ? "Alfred principal" : "Alfred-Laboratory";
       return {
         id: shortRepo(repo) + " #" + issue.number, repo, number:issue.number, origin, lane, status,
-        title: String(issue.title || "Sem título"),
+        title: String(issue.title || "Sem título"), body: String(issue.body || ""),
         desc: (isPR ? "Pull request" : "Issue") + " pública de " + origin + ". " + status + ". Última alteração: " + (issue.updated_at ? dateLabel(new Date(issue.updated_at)) : "não informada") + ".",
         marks: [isPR,false,false,false,isMerged],
         ciStatus:"CI ainda não consultado", ciChecked:false,
@@ -380,6 +426,75 @@
       if(!document.hidden&&Date.now()-lastSync>INTERVAL_MS)sync("open");
     });
     setInterval(()=>{if(!document.hidden&&Date.now()-lastSync>=INTERVAL_MS)sync("open");},INTERVAL_MS);
+
+    const QUICK_AREAS=[
+      ["Estudos e materiais",/estud|flashcard|simulad|quest[oõ]es|ocr|red[aã][cç]|tutor/i],
+      ["Calendário e agenda",/agenda|calend|eventkit|compromiss|eventos|ics\b/i],
+      ["Assistente e agentes",/assistente|assistant|agente|equipe|orquestr|brain|provider|groq|gemini|claude|roteamento|central de ias/i],
+      ["Interface e navegação",/interface|design|navega|mascote|visual|marca|layout|acessib|mobile|iphone|safari|ios\b/i],
+      ["Dados e backup",/backup|restaur|criptograf|seguran|indexeddb|armazen|persist[eê]n/i],
+      ["Infraestrutura",/deploy|pages|publica[cç]|infra|workflow|agendamento|pipeline|licen[cç]|ci\b/i],
+      ["Outras melhorias",/.*/]
+    ];
+    const quickTechnical = title => /^(?:test|docs|ci|chore|build|refactor|lint)\s*(?:\(|:)/i.test(title);
+    function quickDescription(body){
+      const lines=String(body||"").split(/\r?\n/).map(x=>x.trim());
+      let start=lines.findIndex(x=>/^#{1,4}\s*(objetivo|resumo|o que muda|problema|comportamento)/i.test(x));
+      const ordered=(start>=0?lines.slice(start+1,start+7):[]).concat(lines);
+      const pick=ordered.map(x=>x.replace(/^[-*#\s]+/,"").replace(/<[^>]*>/g," ").replace(/\[([^\]]+)\]\([^)]+\)/g,"$1").replace(/[*\x60]/g,"").replace(/\s+/g," ").trim()).find(x=>x.length>32 && !/^refs?\s*#|^https?:\/\/|^\/\//i.test(x));
+      if(!pick)return "Sem descrição breve verificável no GitHub. Abra o registro para conferir o escopo.";
+      return pick.length>190?pick.slice(0,187).replace(/\s+\S*$/,"")+"…":pick;
+    }
+    function quickElement(tag, cls, value){
+      const el=document.createElement(tag); if(cls)el.className=cls; if(value!==undefined)el.textContent=value;return el;
+    }
+    function quickRecord(t){
+      const item=quickElement("article","quick-record");
+      let state=t.isPR?(t.isDraft?"PR em rascunho":"PR aberta para revisão"):"Issue aberta";
+      if(t.ownerRequested)state+=" · decisão sinalizada";
+      else if(t.priority)state+=" · prioridade alta";
+      item.append(quickElement("div","meta",t.origin+" · #"+t.number+" · "+state));
+      item.append(quickElement("h4","",t.title));
+      item.append(quickElement("p","",quickDescription(t.body)));
+      const a=quickElement("a","","Abrir registro no GitHub"); a.href=t.url; a.target="_blank";a.rel="noopener noreferrer";item.append(a);return item;
+    }
+    function quickRender(){
+      const active=tasks.filter(t=>!t.isClosed);
+      const technical=active.filter(t=>quickTechnical(t.title));
+      const product=active.filter(t=>!quickTechnical(t.title));
+      const groups=QUICK_AREAS.map(([name,re])=>({name,items:product.filter(t=>re.test(t.title) && QUICK_AREAS.find(([other,otherRe])=>otherRe.test(t.title))[0]===name)})).filter(g=>g.items.length);
+      const counts=[
+        [groups.length,"áreas com registros"],
+        [product.filter(x=>x.isPR).length,"PRs de produto"],
+        [product.filter(x=>!x.isPR).length,"pendências de produto"],
+        [technical.length,"registros técnicos"]
+      ];
+      const stats=document.getElementById("quick-stats");stats.replaceChildren();
+      counts.forEach(([value,label])=>{const box=quickElement("div","quick-stat");box.append(quickElement("strong","",String(value)),quickElement("span","",label));stats.append(box);});
+      const priorities=document.getElementById("quick-priorities");priorities.replaceChildren();
+      const h=quickElement("h3","","Prioridades e decisões sinalizadas");priorities.append(h);
+      const important=product.filter(t=>t.ownerRequested||t.priority).sort((a,b)=>Number(b.ownerRequested)-Number(a.ownerRequested)||String(b.updatedAt).localeCompare(String(a.updatedAt)));
+      if(!important.length)priorities.append(quickElement("p","quick-empty","Nenhum item aberto tem marcação explícita de P0/P1 ou decisão pendente."));
+      else important.slice(0,4).forEach(t=>priorities.append(quickRecord(t)));
+      const areaRoot=document.getElementById("quick-areas");areaRoot.replaceChildren();
+      if(!groups.length)areaRoot.append(quickElement("p","quick-empty","Não há frentes de produto identificadas nos registros consultados."));
+      groups.forEach(group=>{
+        const details=quickElement("details","quick-area"),summary=quickElement("summary");
+        summary.append(quickElement("strong","",group.name));
+        const count=group.items.filter(t=>t.isPR).length+" PR(s) · "+group.items.filter(t=>!t.isPR).length+" pendência(s)";
+        summary.append(quickElement("small","",count));
+        summary.append(quickElement("span","preview","Exemplo: "+(group.items.find(t=>t.isPR)||group.items[0]).title));
+        const body=quickElement("div","quick-content");group.items.forEach(t=>body.append(quickRecord(t)));
+        details.append(summary,body);areaRoot.append(details);
+      });
+      const tech=document.getElementById("quick-tech-items");tech.replaceChildren();
+      document.getElementById("quick-tech-label").textContent="Mostrar "+technical.length+" registros técnicos (testes, documentação, CI)";
+      technical.forEach(t=>tech.append(quickRecord(t)));
+      if(!technical.length)tech.append(quickElement("p","quick-empty","Nenhum registro técnico aberto."));
+    }
+    const originalRender=render;
+    render=function(){originalRender();quickRender();};
+
     render();sync("open");
   </script>
 </body>
